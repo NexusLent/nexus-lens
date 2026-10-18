@@ -10,12 +10,65 @@
 <div class="status">● PROTOTIPO ANDROID · CÁMARA EN VIVO</div>
 <div class="view" id="view"><div class="placeholder" id="placeholder"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></svg><strong>Tu lente inteligente</strong><div>Iniciá la cámara para probar la vista adaptada.</div><span class="pill">La cámara requiere permiso</span></div><video id="video" playsinline autoplay muted></video><div class="overlay"></div><div class="scan"></div></div>
 <div class="actions"><button class="btn primary" id="start">Activar cámara</button><button class="btn" id="stop" disabled>Detener cámara</button></div>
+
+<section class="section">
+  <h2>Lectura de texto</h2>
+  <button class="btn primary" id="readText">Leer texto con la cámara</button>
+  <p class="notice">Apuntá la cámara a un texto bien iluminado y mantené el teléfono quieto.</p>
+  <div class="result" id="ocrResult">El texto reconocido aparecerá aquí.</div>
+</section>
+
 <section class="section"><h2>Vista adaptada para colores</h2><div class="filters" id="filters"><button class="selected" data-filter="none">Normal</button><button data-filter="protanopia">Rojo–verde A</button><button data-filter="deuteranopia">Rojo–verde B</button><button data-filter="tritanopia">Azul–amarillo</button><button data-filter="contrast">Alto contraste</button></div><p class="notice">Estos filtros son una demostración visual inicial, no una corrección médica ni garantizan distinguir todos los colores. Los ajustes se aplican a la imagen de cámara mientras está activa.</p></section>
 <section class="section"><h2>Asistencia automática (vista de prototipo)</h2><div class="feature"><div><span>Detección de texto</span><small>Preparado para integrar reconocimiento OCR</small></div><input class="switch" type="checkbox" checked disabled aria-label="Detección de texto prevista"></div><div class="feature"><div><span>Traducción en pantalla</span><small>Se integrará con reconocimiento de idioma y traducción</small></div><input class="switch" type="checkbox" checked disabled aria-label="Traducción prevista"></div><div class="feature"><div><span>Descripción por voz</span><small>Lectura y descripción automática de escenas, siguiente etapa</small></div><input class="switch" type="checkbox" checked disabled aria-label="Descripción por voz prevista"></div><div class="feature"><div><span>Lectura de Braille</span><small>Requiere un detector específico y pruebas con puntos en relieve</small></div><input class="switch" type="checkbox" checked disabled aria-label="Lectura Braille prevista"></div></section>
 <section class="section"><h2>Estado del prototipo</h2><div class="result" id="result"><strong>Listo para probar.</strong> Activá la cámara y seleccioná un filtro. Esta primera entrega prueba la cámara y la visualización; todavía no reconoce ni traduce texto automáticamente.</div></section>
 <p class="notice">Privacidad: esta demo muestra la cámara localmente y no sube video a ningún servidor. Usá una conexión segura (HTTPS) o abrí el prototipo en un entorno local para permitir el acceso a cámara.</p><footer>NEXUS LENS · PROTOTIPO 0.1 · NO usar como sustituto de ayudas de navegación o seguridad.</footer>
 </main><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script><script>
 const video=document.querySelector('#video'),view=document.querySelector('#view'),placeholder=document.querySelector('#placeholder'),start=document.querySelector('#start'),stop=document.querySelector('#stop'),result=document.querySelector('#result');let stream=null;
+
+const readTextButton = document.querySelector('#readText');
+const ocrResult = document.querySelector('#ocrResult');
+
+readTextButton.addEventListener('click', async () => {
+  if (!stream || !video.videoWidth) {
+    ocrResult.textContent = 'Primero activá la cámara.';
+    return;
+  }
+
+  if (!window.Tesseract) {
+    ocrResult.textContent = 'No se pudo cargar el lector. Revisá tu conexión a internet.';
+    return;
+  }
+
+  readTextButton.disabled = true;
+  ocrResult.textContent = 'Leyendo texto... mantené el teléfono quieto.';
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    const resultadoOCR = await Tesseract.recognize(
+      canvas,
+      'spa',
+      { logger: info => {
+          if (info.status === 'recognizing text') {
+            ocrResult.textContent =
+              `Reconociendo texto: ${Math.round(info.progress * 100)}%`;
+          }
+        }
+      }
+    );
+
+    const texto = resultadoOCR.data.text.trim();
+    ocrResult.textContent = texto || 'No se encontró texto. Probá con más luz y acercá la cámara.';
+  } catch (error) {
+    ocrResult.textContent = 'No se pudo leer el texto. Revisá tu conexión e intentá de nuevo.';
+  } finally {
+    readTextButton.disabled = false;
+  }
+});
+
 const filters={none:'none',protanopia:'saturate(.78) sepia(.12) hue-rotate(-12deg)',deuteranopia:'saturate(.72) sepia(.08) hue-rotate(18deg)',tritanopia:'saturate(.8) hue-rotate(35deg)',contrast:'contrast(1.55) saturate(1.15)'};
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('selected',x===b));video.style.filter=filters[b.dataset.filter];result.innerHTML='<strong>Filtro seleccionado:</strong> '+b.textContent+'. El efecto se aplica a la imagen de cámara.';}));
 start.addEventListener('click',async()=>{try{if(!navigator.mediaDevices?.getUserMedia)throw new Error('El navegador no permite cámara en este contexto. Abrí la página mediante HTTPS.');stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;await video.play();video.classList.add('active');placeholder.style.display='none';view.classList.add('scanning');start.disabled=true;stop.disabled=false;result.innerHTML='<strong>Cámara activa.</strong> La imagen se procesa visualmente en este dispositivo. El reconocimiento y la traducción automática todavía deben integrarse.';}catch(e){result.innerHTML='<strong>No se pudo activar la cámara.</strong> '+e.message+' Revisá el permiso de cámara del navegador y que la página use HTTPS.';}});
