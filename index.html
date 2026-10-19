@@ -16,6 +16,9 @@
   <button class="btn primary" id="readText">Leer texto con la cámara</button>
   <p class="notice">Apuntá la cámara a un texto bien iluminado y mantené el teléfono quieto.</p>
   <div class="result" id="ocrResult">El texto reconocido aparecerá aquí.</div>
+<button class="btn" id="speakTranslation">
+  🔊 Escuchar texto
+</button>
 </section>
 
 <section class="section"><h2>Vista adaptada para colores</h2><div class="filters" id="filters"><button class="selected" data-filter="none">Normal</button><button data-filter="protanopia">Rojo–verde A</button><button data-filter="deuteranopia">Rojo–verde B</button><button data-filter="tritanopia">Azul–amarillo</button><button data-filter="contrast">Alto contraste</button></div><p class="notice">Estos filtros son una demostración visual inicial, no una corrección médica ni garantizan distinguir todos los colores. Los ajustes se aplican a la imagen de cámara mientras está activa.</p></section>
@@ -27,7 +30,30 @@ const video=document.querySelector('#video'),view=document.querySelector('#view'
 
 const readTextButton = document.querySelector('#readText');
 const ocrResult = document.querySelector('#ocrResult');
+const speakButton = document.querySelector('#speakTranslation');
 
+speakButton.addEventListener('click', () => {
+  const texto = ocrResult.textContent.trim();
+
+  if (!texto || texto === 'El texto reconocido aparecerá aquí.' ||
+      texto.startsWith('Leyendo texto') ||
+      texto.startsWith('Reconociendo texto:')) {
+    ocrResult.textContent = 'Primero leé un texto con la cámara.';
+    return;
+  }
+
+  if (!('speechSynthesis' in window)) {
+    ocrResult.textContent = 'La lectura por voz no está disponible.';
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const voz = new SpeechSynthesisUtterance(texto);
+  voz.lang = 'es-AR';
+  voz.rate = 0.9;
+  window.speechSynthesis.speak(voz);
+});
 readTextButton.addEventListener('click', async () => {
   if (!stream || !video.videoWidth) {
     ocrResult.textContent = 'Primero activá la cámara.';
@@ -50,7 +76,7 @@ readTextButton.addEventListener('click', async () => {
 
     const resultadoOCR = await Tesseract.recognize(
       canvas,
-      'spa',
+      'eng+spa',
       { logger: info => {
           if (info.status === 'recognizing text') {
             ocrResult.textContent =
