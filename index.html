@@ -95,17 +95,19 @@ readTextButton.addEventListener('click', async () => {
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
 
-    const resultadoOCR = await Tesseract.recognize(
-      canvas,
-      'eng+spa',
-      { logger: info => {
-          if (info.status === 'recognizing text') {
-            ocrResult.textContent =
-              `Reconociendo texto: ${Math.round(info.progress * 100)}%`;
-          }
-        }
+const resultadoOCR = await Tesseract.recognize(
+  canvas,
+  'spa',
+  {
+    logger: info => {
+      if (info.status === 'recognizing text') {
+        ocrResult.textContent =
+          `Reconociendo texto: ${Math.round(info.progress * 100)}%`;
       }
-    );
+    },
+    preserve_interword_spaces: '1'
+  }
+);
 
     const texto = resultadoOCR.data.text.trim();
     ocrResult.textContent = texto || 'No se encontró texto. Probá con más luz y acercá la cámara.';
